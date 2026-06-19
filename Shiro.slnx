@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/server/">
     <Project Path="server/Shiro.Api/Shiro.Api.csproj" />
+    <Project Path="server/Shiro.Core/Shiro.Core.csproj" />
+    <Project Path="server/Shiro.Infrastructure/Shiro.Infrastructure.csproj" />
   </Folder>
 </Solution>
