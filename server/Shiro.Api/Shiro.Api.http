@@ -1,0 +1,6 @@
+@Shiro.Api_HostAddress = http://localhost:5293
+
+GET {{Shiro.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/server/">
+    <Project Path="server/Shiro.Api/Shiro.Api.csproj" />
+  </Folder>
+</Solution>
