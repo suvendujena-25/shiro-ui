@@ -1,0 +1,84 @@
+
+> shiro-ui@0.0.0 start
+> ng serve
+
+> Building...
+√ Building...
+Initial chunk files | Names         |  Raw size
+main.js             | main          |  50.36 kB | 
+styles.css          | styles        | 209 bytes | 
+
+                    | Initial total |  50.57 kB
+
+Application bundle generation complete. [1.303 seconds] - 2026-06-22T08:58:11.573Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4200[22m/[39m
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 50.80 kB | 
+
+Application bundle generation complete. [0.464 seconds] - 2026-06-22T09:02:30.339Z
+
+Page reload sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Application bundle generation failed. [0.179 seconds] - 2026-06-22T09:10:12.151Z
+
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Application bundle generation failed. [0.160 seconds] - 2026-06-22T09:11:21.026Z
+
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names         |  Raw size
+main.js             | main          |  54.28 kB | 
+styles.css          | styles        | 209 bytes | 
+
+                    | Initial total |  54.49 kB
+
+Application bundle generation complete. [0.224 seconds] - 2026-06-22T09:11:22.079Z
+
+Page reload sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 55.29 kB | 
+
+Application bundle generation complete. [0.317 seconds] - 2026-06-22T09:15:58.659Z
+
+Page reload sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 56.95 kB | 
+
+Application bundle generation complete. [0.216 seconds] - 2026-06-22T09:17:24.103Z
+
+Component update sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 57.87 kB | 
+
+Application bundle generation complete. [0.318 seconds] - 2026-06-22T09:17:25.292Z
+
+Component update sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 57.39 kB | 
+
+Application bundle generation complete. [0.241 seconds] - 2026-06-22T09:20:37.069Z
+
+Component update sent to client(s).
+> Changes detected. Rebuilding...
+√ Changes detected. Rebuilding...
+Initial chunk files | Names | Raw size
+main.js             | main  | 56.04 kB | 
+
+Application bundle generation complete. [0.268 seconds] - 2026-06-22T09:20:38.078Z
+
+Component update sent to client(s).

@@ -22,7 +22,7 @@ It is responsible for:
 - Receiving HTTP requests from the frontend.
 - Configuring authentication and authorization.
 - Registering application services.
-- Exposing OpenAPI documentation.
+- Exposing OpenAPI and Swagger documentation.
 - Starting and hosting the backend application.
 
 ### Shiro.Core
@@ -63,6 +63,16 @@ Why we added it:
 - Helps expose machine-readable API documentation.
 - Supports endpoints like `/openapi/v1.json`.
 - Makes API testing and client integration easier.
+
+#### Swashbuckle.AspNetCore
+
+Used to add Swagger support to the Web API.
+
+Why we added it:
+
+- Provides the Swagger UI page for testing API endpoints in the browser.
+- Generates Swagger/OpenAPI metadata that tools can read.
+- Makes local API development easier because endpoints can be viewed and tested from `/swagger`.
 
 #### Microsoft.EntityFrameworkCore.Design
 
@@ -196,3 +206,212 @@ Shiro.Api -> Shiro.Core
 ```
 
 `Shiro.Core` should not depend on `Shiro.Api` or `Shiro.Infrastructure`.
+
+## API Documentation Endpoints
+
+In the development environment, the API exposes documentation at:
+
+```text
+/openapi/v1.json
+/swagger
+```
+
+`/openapi/v1.json` returns the machine-readable OpenAPI document.
+
+`/swagger` opens the Swagger UI page for testing API endpoints in the browser.
+
+## Current Shiro Agent Flow
+
+The backend currently supports a safe starter agent flow:
+
+```text
+ChatController -> ChatService -> ToolRouter
+```
+
+`ToolRouter` separates actions into:
+
+- Safe tools, such as `create_task`, which can run immediately.
+- Risky tools, such as `send_email`, which require user approval first.
+
+No real email, payment, file deletion, or external messaging is executed yet.
+Risky tools are stored as approval requests and then passed through a fake executor only after approval.
+
+For normal chat messages that are not routed to a local tool, `ChatService` calls the configured AI provider.
+The default provider is Ollama, so Shiro can run with a free local model.
+
+## Ollama Configuration
+
+Install Ollama, then pull the configured model:
+
+```powershell
+& "C:\Users\suven\AppData\Local\Programs\Ollama\ollama.exe" pull llama3.2:3b
+```
+
+If `ollama` is available in your terminal PATH, this shorter command also works:
+
+```powershell
+ollama pull llama3.2:3b
+```
+
+The current local AI settings live in `appsettings.json`:
+
+```json
+{
+  "AI": {
+    "Provider": "Ollama"
+  },
+  "Ollama": {
+    "BaseUrl": "http://localhost:11434",
+    "Model": "llama3.2:3b"
+  }
+}
+```
+
+After pulling the model, restart `Shiro.Api`.
+
+## OpenAI Configuration
+
+OpenAI is optional. Use this only if you want to switch from local Ollama to OpenAI.
+
+Do not store the OpenAI API key in `appsettings.json`.
+
+For local development, use either user secrets:
+
+```powershell
+cd Shiro.Api
+dotnet user-secrets init
+dotnet user-secrets set "OpenAI:ApiKey" "YOUR_API_KEY"
+```
+
+Or set an environment variable:
+
+```powershell
+$env:OPENAI_API_KEY = "YOUR_API_KEY"
+```
+
+The current model setting lives in `appsettings.json`:
+
+```json
+{
+  "OpenAI": {
+    "BaseUrl": "https://api.openai.com",
+    "Model": "gpt-4.1-mini"
+  }
+}
+```
+
+## Current API Endpoints
+
+```http
+POST /api/chat
+GET  /api/approvals/pending
+GET  /api/approvals/{approvalId}
+POST /api/approvals/{approvalId}/approve
+POST /api/approvals/{approvalId}/reject
+GET  /api/tasks
+POST /api/tasks
+GET  /api/audit
+GET  /api/audit/approvals/{approvalId}
+```
+
+## Microservice Integration
+
+`Shiro.Api` can be used as a standalone HTTP microservice from Angular, React, mobile, or any other client.
+
+For React development, CORS currently allows:
+
+```text
+http://localhost:3000
+http://127.0.0.1:3000
+http://localhost:5173
+http://127.0.0.1:5173
+```
+
+React can call the chat API like this:
+
+```ts
+const response = await fetch('http://localhost:5293/api/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    conversationId,
+    message: 'hello shiro'
+  })
+});
+
+const data = await response.json();
+```
+
+The main contract is:
+
+```text
+POST /api/chat
+```
+
+Request:
+
+```json
+{
+  "conversationId": "optional-existing-conversation-id",
+  "message": "hello shiro"
+}
+```
+
+Response:
+
+```json
+{
+  "conversationId": "conversation-id",
+  "responseType": 1,
+  "message": "assistant reply",
+  "requiresApproval": false,
+  "toolName": null,
+  "approvalId": null
+}
+```
+
+## Manual Test Flow
+
+Create a safe task through chat:
+
+```http
+POST /api/chat
+```
+
+```json
+{
+  "message": "create task buy milk"
+}
+```
+
+This immediately creates a task and writes a safe-tool audit entry.
+
+Create a risky approval request:
+
+```http
+POST /api/chat
+```
+
+```json
+{
+  "message": "send email to John saying I will be late"
+}
+```
+
+This returns `responseType: ApprovalRequired` and an `approvalId`.
+
+Approve the risky request:
+
+```http
+POST /api/approvals/{approvalId}/approve
+```
+
+This runs only the fake tool executor. It does not send a real email.
+
+Review history:
+
+```http
+GET /api/audit
+```
