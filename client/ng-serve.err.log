@@ -1,0 +1,14 @@
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2663: Cannot find name 'errorMessage'. Did you mean the instance member 'this.errorMessage'?[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/app.ts:317:30:
+[37m      317 │         this.errorMessage.set([32merrorMessage[37m);
+          ╵                               [32m~~~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2663: Cannot find name 'errorMessage'. Did you mean the instance member 'this.errorMessage'?[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/app.ts:317:30:
+[37m      317 │         this.errorMessage.set([32merrorMessage[37m);
+          ╵                               [32m~~~~~~~~~~~~[0m
+
+

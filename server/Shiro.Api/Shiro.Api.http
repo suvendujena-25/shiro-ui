@@ -1,6 +1,32 @@
 @Shiro.Api_HostAddress = http://localhost:5293
 
-GET {{Shiro.Api_HostAddress}}/weatherforecast/
+POST {{Shiro.Api_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "create task buy milk"
+}
+
+###
+
+POST {{Shiro.Api_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "send email to John saying I will be late"
+}
+
+###
+
+GET {{Shiro.Api_HostAddress}}/api/approvals/pending
 Accept: application/json
 
 ###
+
+GET {{Shiro.Api_HostAddress}}/api/tasks
+Accept: application/json
+
+###
+
+GET {{Shiro.Api_HostAddress}}/api/audit
+Accept: application/json
