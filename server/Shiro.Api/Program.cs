@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Shiro.Api.Data;
 using Shiro.Api.Models;
 using Shiro.Api.Services;
 using Shiro.Api.Tools;
@@ -14,6 +16,11 @@ builder.Services.AddControllers();
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection("AI"));
 builder.Services.Configure<OpenAiOptions>(builder.Configuration.GetSection("OpenAI"));
 builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.AddDbContext<ShiroDbContext>(options =>
+{
+    options.UseSqlite(builder.Configuration.GetConnectionString("ShiroDb")
+        ?? "Data Source=shiro-history.db");
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(angularDevelopmentCorsPolicy, policy =>
@@ -34,6 +41,7 @@ builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IToolRouter, ToolRouter>();
 builder.Services.AddScoped<IToolExecutor, FakeToolExecutor>();
 builder.Services.AddSingleton<IDeviceInfoService, DeviceInfoService>();
+builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>();
 var aiProvider = builder.Configuration.GetSection("AI").Get<AiOptions>()?.Provider ?? "Ollama";
 
 if (aiProvider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
@@ -61,8 +69,15 @@ else
 builder.Services.AddSingleton<IApprovalService, InMemoryApprovalService>();
 builder.Services.AddSingleton<IAuditLogService, InMemoryAuditLogService>();
 builder.Services.AddSingleton<ITaskService, InMemoryTaskService>();
+builder.Services.AddScoped<IConversationHistoryService, DatabaseConversationHistoryService>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ShiroDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

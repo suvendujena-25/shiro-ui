@@ -20,7 +20,10 @@ public sealed class OpenAiResponsesChatClient : IOpenAiChatClient
         this.options = options.Value;
     }
 
-    public async Task<string?> GetReplyAsync(string userMessage, CancellationToken cancellationToken)
+    public async Task<string?> GetReplyAsync(
+        string userMessage,
+        IReadOnlyCollection<ChatHistoryMessage> history,
+        CancellationToken cancellationToken)
     {
         var apiKey = GetApiKey();
 
@@ -31,36 +34,52 @@ public sealed class OpenAiResponsesChatClient : IOpenAiChatClient
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var input = new List<OpenAiInputMessage>
+        {
+            new()
+            {
+                Role = "developer",
+                Content =
+                [
+                    new OpenAiInputContent
+                    {
+                        Text = BuildDeveloperInstruction(),
+                        Type = "input_text"
+                    }
+                ]
+            }
+        };
+
+        input.AddRange(history.Select(message => new OpenAiInputMessage
+        {
+            Role = message.Role,
+            Content =
+            [
+                new OpenAiInputContent
+                {
+                    Text = message.Content,
+                    Type = "input_text"
+                }
+            ]
+        }));
+
+        input.Add(new OpenAiInputMessage
+        {
+            Role = "user",
+            Content =
+            [
+                new OpenAiInputContent
+                {
+                    Text = userMessage,
+                    Type = "input_text"
+                }
+            ]
+        });
+
         request.Content = JsonContent(new OpenAiResponseRequest
         {
             Model = options.Model,
-            Input =
-            [
-                new OpenAiInputMessage
-                {
-                    Role = "developer",
-                    Content =
-                    [
-                        new OpenAiInputContent
-                        {
-                            Text = BuildDeveloperInstruction(),
-                            Type = "input_text"
-                        }
-                    ]
-                },
-                new OpenAiInputMessage
-                {
-                    Role = "user",
-                    Content =
-                    [
-                        new OpenAiInputContent
-                        {
-                            Text = userMessage,
-                            Type = "input_text"
-                        }
-                    ]
-                }
-            ]
+            Input = input
         });
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -78,9 +97,10 @@ public sealed class OpenAiResponsesChatClient : IOpenAiChatClient
 
     public async IAsyncEnumerable<string> StreamReplyAsync(
         string userMessage,
+        IReadOnlyCollection<ChatHistoryMessage> history,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var reply = await GetReplyAsync(userMessage, cancellationToken);
+        var reply = await GetReplyAsync(userMessage, history, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(reply))
         {
@@ -108,6 +128,7 @@ public sealed class OpenAiResponsesChatClient : IOpenAiChatClient
         return """
             You are Shiro, a careful personal AI assistant inside a learning project.
             Be conversational, concise, and useful.
+            Use the recent conversation history to remember context inside the current chat.
             Current backend tools:
             - If the user wants a local task, tell them to say: create task <title>.
             - If the user asks to send email, message someone, delete files, pay bills, or take another risky action, explain that Shiro must ask for approval first and must not claim the action is done.

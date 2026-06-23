@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, Pipe, PipeTransform, inject, signal } from '@angular/core';
+import { Component, ElementRef, Pipe, PipeTransform, QueryList, ViewChild, ViewChildren, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
@@ -73,18 +73,19 @@ interface ChatMessage {
   response?: ChatResponse;
 }
 
-@Pipe({ name: 'responseTypeLabel' })
-export class ResponseTypeLabelPipe implements PipeTransform {
-  transform(value: number): string {
-    switch (value) {
-      case 2:
-        return 'Tool call';
-      case 3:
-        return 'Approval required';
-      default:
-        return 'Message';
-    }
-  }
+interface ConversationSummary {
+  id: string;
+  title: string;
+  messageCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
+interface ConversationMessage {
+  id: string;
+  role: string;
+  content: string;
+  createdAtUtc: string;
 }
 
 @Pipe({ name: 'auditEventLabel' })
@@ -111,18 +112,22 @@ export class AuditEventLabelPipe implements PipeTransform {
 
 @Component({
   selector: 'app-root',
-  imports: [DatePipe, FormsModule, ResponseTypeLabelPipe, AuditEventLabelPipe],
+  imports: [DatePipe, FormsModule, AuditEventLabelPipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class App {
   private readonly http = inject(HttpClient);
+  @ViewChild('messageInput') private messageInput?: ElementRef<HTMLTextAreaElement>;
+  @ViewChild('conversationPanel') private conversationPanel?: ElementRef<HTMLDivElement>;
+  @ViewChildren('chatMessage') private chatMessageElements?: QueryList<ElementRef<HTMLElement>>;
 
   protected readonly messageText = signal('');
   protected readonly conversationId = signal<string | undefined>(undefined);
   protected readonly chatMessages = signal<ChatMessage[]>([]);
   protected readonly lastResponse = signal<ChatResponse | null>(null);
   protected readonly pendingApprovals = signal<ApprovalRecord[]>([]);
+  protected readonly conversations = signal<ConversationSummary[]>([]);
   protected readonly tasks = signal<ShiroTask[]>([]);
   protected readonly auditEntries = signal<AuditLogEntry[]>([]);
   protected readonly errorMessage = signal<string | null>(null);
@@ -130,6 +135,7 @@ export class App {
   protected readonly isSending = signal(false);
   protected readonly isWaitingForFirstToken = signal(false);
   protected readonly isRefreshing = signal(false);
+  protected readonly copiedMessageId = signal<string | null>(null);
   private lastFailedUserMessage: string | null = null;
 
   constructor() {
@@ -138,6 +144,44 @@ export class App {
 
   protected usePrompt(prompt: string): void {
     this.messageText.set(prompt);
+    this.focusMessageInput();
+  }
+
+  protected startNewConversation(): void {
+    this.conversationId.set(undefined);
+    this.chatMessages.set([]);
+    this.lastResponse.set(null);
+    this.failedChatMessage.set(null);
+    this.errorMessage.set(null);
+    this.messageText.set('');
+    this.lastFailedUserMessage = null;
+    this.focusMessageInput();
+  }
+
+  protected loadConversation(conversation: ConversationSummary): void {
+    this.errorMessage.set(null);
+
+    this.http.get<ConversationMessage[]>(`${apiBaseUrl}/conversations/${conversation.id}/messages`).subscribe({
+      next: messages => {
+        this.conversationId.set(conversation.id);
+        this.chatMessages.set(messages.map(message => ({
+          id: message.id,
+          sender: message.role === 'user' ? 'user' : 'shiro',
+          text: message.content,
+          createdAtUtc: message.createdAtUtc
+        })));
+        this.focusMessageInput();
+
+        const lastMessage = messages.at(-1);
+
+        if (lastMessage) {
+          this.scrollMessageToTop(lastMessage.id);
+        }
+      },
+      error: error => {
+        this.errorMessage.set(this.buildApiErrorMessage('load conversation history', error));
+      }
+    });
   }
 
   protected handleMessageKeydown(event: KeyboardEvent): void {
@@ -165,6 +209,45 @@ export class App {
     }
 
     await this.sendChatMessage(this.lastFailedUserMessage, false);
+  }
+
+  protected async copyMessage(message: ChatMessage): Promise<void> {
+    if (!message.text) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(message.text);
+    this.copiedMessageId.set(message.id);
+    setTimeout(() => {
+      if (this.copiedMessageId() === message.id) {
+        this.copiedMessageId.set(null);
+      }
+    }, 1600);
+  }
+
+  protected getSourceLabel(message: ChatMessage): string | null {
+    if (message.sender !== 'shiro' || !message.response) {
+      return null;
+    }
+
+    switch (message.response.toolName) {
+      case 'weather_lookup':
+        return 'Source: Open-Meteo weather service';
+      case 'current_datetime':
+        return 'Source: Local device clock';
+      case 'create_task':
+        return 'Source: Shiro local task tool';
+      default:
+        return 'Source: Ollama local model';
+    }
+  }
+
+  protected getSourceUrl(message: ChatMessage): string | null {
+    if (message.response?.toolName === 'weather_lookup') {
+      return 'https://open-meteo.com/';
+    }
+
+    return null;
   }
 
   private async sendChatMessage(message: string, appendUserMessage: boolean): Promise<void> {
@@ -200,6 +283,7 @@ export class App {
     try {
       await this.streamChatResponse(request, shiroMessageId);
       this.lastFailedUserMessage = null;
+      this.loadConversations();
     } catch (error) {
       this.removeChatMessage(shiroMessageId);
       this.lastFailedUserMessage = message;
@@ -207,6 +291,7 @@ export class App {
     } finally {
       this.isSending.set(false);
       this.isWaitingForFirstToken.set(false);
+      this.focusMessageInput();
     }
   }
 
@@ -299,6 +384,7 @@ export class App {
           : message
       )
     );
+    this.scrollMessageToTop(messageId);
   }
 
   private updateChatMessage(messageId: string, changes: Partial<ChatMessage>): void {
@@ -309,10 +395,12 @@ export class App {
           : message
       )
     );
+    this.scrollMessageToTop(messageId);
   }
 
   private appendChatMessage(message: ChatMessage): void {
     this.chatMessages.update(messages => [...messages, message]);
+    this.scrollMessageToTop(message.id);
   }
 
   private removeChatMessage(messageId: string): void {
@@ -347,6 +435,7 @@ export class App {
     this.isRefreshing.set(true);
     this.errorMessage.set(null);
     this.loadPendingApprovals();
+    this.loadConversations();
     this.loadTasks();
     this.loadAudit(() => this.isRefreshing.set(false));
   }
@@ -355,6 +444,13 @@ export class App {
     this.http.get<ApprovalRecord[]>(`${apiBaseUrl}/approvals/pending`).subscribe({
       next: approvals => this.pendingApprovals.set(approvals),
       error: error => this.errorMessage.set(this.buildApiErrorMessage('load pending approvals', error))
+    });
+  }
+
+  private loadConversations(): void {
+    this.http.get<ConversationSummary[]>(`${apiBaseUrl}/conversations`).subscribe({
+      next: conversations => this.conversations.set(conversations),
+      error: error => this.errorMessage.set(this.buildApiErrorMessage('load chat history', error))
     });
   }
 
@@ -398,5 +494,27 @@ export class App {
     }
 
     return 'Shiro could not send that message. Check that the API is running, then retry.';
+  }
+
+  private focusMessageInput(): void {
+    setTimeout(() => this.messageInput?.nativeElement.focus(), 0);
+  }
+
+  private scrollMessageToTop(messageId: string): void {
+    requestAnimationFrame(() => {
+      const conversation = this.conversationPanel?.nativeElement;
+      const target = this.chatMessageElements
+        ?.find(element => element.nativeElement.dataset['messageId'] === messageId)
+        ?.nativeElement;
+
+      if (!conversation || !target) {
+        return;
+      }
+
+      conversation.scrollTo({
+        top: target.offsetTop - conversation.offsetTop,
+        behavior: 'smooth'
+      });
+    });
   }
 }

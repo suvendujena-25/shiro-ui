@@ -1,7 +1,7 @@
 <main class="app-shell">
   <aside class="sidebar">
     <div class="brand-block">
-      <span class="brand-mark">S</span>
+      <img class="brand-avatar" src="assets/shiro-beagle.png" alt="Shiro beagle assistant" />
       <div>
         <p class="eyebrow">Shiro AI</p>
         <h1>Agent Console</h1>
@@ -24,6 +24,7 @@
     </section>
 
     <div class="quick-actions" aria-label="Example prompts">
+      <button type="button" (click)="startNewConversation()">New chat</button>
       <button type="button" (click)="usePrompt('hello shiro')">Say hello</button>
       <button type="button" (click)="usePrompt('create task buy milk')">Create task</button>
       <button type="button" (click)="usePrompt('send email to John saying I will be late')">
@@ -49,15 +50,17 @@
       <p class="error-banner">{{ errorMessage() }}</p>
     }
 
-    <div class="conversation" aria-label="Chat conversation">
+    <div #conversationPanel class="conversation" aria-label="Chat conversation">
         @for (message of chatMessages(); track message.id) {
-          <article class="chat-bubble" [class.user-message]="message.sender === 'user'">
+          <article
+            #chatMessage
+            class="chat-bubble"
+            [class.user-message]="message.sender === 'user'"
+            [attr.data-message-id]="message.id"
+          >
             <div class="response-header">
               <span [class.approval]="message.response?.requiresApproval">
                 {{ message.sender === 'user' ? 'You' : 'Shiro' }}
-                @if (message.response) {
-                  - {{ message.response.responseType | responseTypeLabel }}
-                }
               </span>
               <small>{{ message.createdAtUtc | date: 'short' }}</small>
             </div>
@@ -86,10 +89,35 @@
                 }
               </dl>
             }
+
+            <div class="message-actions">
+              <button
+                type="button"
+                class="message-action"
+                (click)="copyMessage(message)"
+                [attr.aria-label]="copiedMessageId() === message.id ? 'Copied message' : 'Copy message'"
+                [attr.title]="copiedMessageId() === message.id ? 'Copied' : 'Copy'"
+              >
+                @if (copiedMessageId() === message.id) {
+                  <span aria-hidden="true">✓</span>
+                } @else {
+                  <span aria-hidden="true">⧉</span>
+                }
+              </button>
+              @if (getSourceLabel(message); as sourceLabel) {
+                @if (getSourceUrl(message); as sourceUrl) {
+                  <a class="source-link" [href]="sourceUrl" target="_blank" rel="noreferrer">
+                    {{ sourceLabel }}
+                  </a>
+                } @else {
+                  <span class="source-link">{{ sourceLabel }}</span>
+                }
+              }
+            </div>
           </article>
         } @empty {
           <div class="welcome-state">
-            <span class="brand-mark large">S</span>
+            <img class="brand-avatar large" src="assets/shiro-beagle.png" alt="Shiro beagle assistant" />
             <h2>Good to see you.</h2>
             <p>Ask Shiro anything, create a local task, or test approval safety for risky actions.</p>
           </div>
@@ -98,6 +126,7 @@
 
     <form class="composer" (ngSubmit)="sendMessage()">
       <textarea
+        #messageInput
         name="message"
         placeholder="Message Shiro..."
         [ngModel]="messageText()"
@@ -124,6 +153,31 @@
   </section>
 
   <aside class="inspector">
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">History</p>
+          <h2>Conversations</h2>
+        </div>
+      </div>
+
+      <div class="list history-list">
+        @for (conversation of conversations(); track conversation.id) {
+          <button
+            type="button"
+            class="history-item"
+            [class.active-history]="conversation.id === conversationId()"
+            (click)="loadConversation(conversation)"
+          >
+            <strong>{{ conversation.title }}</strong>
+            <span>{{ conversation.messageCount }} messages - {{ conversation.updatedAtUtc | date: 'short' }}</span>
+          </button>
+        } @empty {
+          <p class="empty-state">No saved conversations yet.</p>
+        }
+      </div>
+    </section>
+
     <section class="panel">
       <div class="panel-heading">
         <div>

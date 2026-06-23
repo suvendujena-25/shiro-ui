@@ -12,3 +12,10 @@
           ╵                               [32m~~~~~~~~~~~~[0m
 
 
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: ResponseTypeLabelPipe is not used within the template of App[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/app.ts:114:35:
+[37m      114 │ ...tePipe, FormsModule, [32mResponseTypeLabelPipe[37m, AuditEventLabelPipe],
+          ╵                         [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+

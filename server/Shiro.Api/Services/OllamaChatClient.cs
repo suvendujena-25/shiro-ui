@@ -20,9 +20,12 @@ public sealed class OllamaChatClient : IAiChatClient
         this.options = options.Value;
     }
 
-    public async Task<string?> GetReplyAsync(string userMessage, CancellationToken cancellationToken)
+    public async Task<string?> GetReplyAsync(
+        string userMessage,
+        IReadOnlyCollection<ChatHistoryMessage> history,
+        CancellationToken cancellationToken)
     {
-        using var request = BuildChatRequest(userMessage, stream: false);
+        using var request = BuildChatRequest(userMessage, history, stream: false);
 
         try
         {
@@ -53,9 +56,10 @@ public sealed class OllamaChatClient : IAiChatClient
 
     public async IAsyncEnumerable<string> StreamReplyAsync(
         string userMessage,
+        IReadOnlyCollection<ChatHistoryMessage> history,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var request = BuildChatRequest(userMessage, stream: true);
+        using var request = BuildChatRequest(userMessage, history, stream: true);
 
         HttpResponseMessage? response;
 
@@ -113,8 +117,32 @@ public sealed class OllamaChatClient : IAiChatClient
         }
     }
 
-    private HttpRequestMessage BuildChatRequest(string userMessage, bool stream)
+    private HttpRequestMessage BuildChatRequest(
+        string userMessage,
+        IReadOnlyCollection<ChatHistoryMessage> history,
+        bool stream)
     {
+        var messages = new List<OllamaMessage>
+        {
+            new()
+            {
+                Role = "system",
+                Content = BuildSystemInstruction()
+            }
+        };
+
+        messages.AddRange(history.Select(message => new OllamaMessage
+        {
+            Role = message.Role,
+            Content = message.Content
+        }));
+
+        messages.Add(new OllamaMessage
+        {
+            Role = "user",
+            Content = userMessage
+        });
+
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat");
         request.Content = JsonContent(new OllamaChatRequest
         {
@@ -126,19 +154,7 @@ public sealed class OllamaChatClient : IAiChatClient
                 NumPredict = options.MaxTokens,
                 Temperature = 0.4
             },
-            Messages =
-            [
-                new OllamaMessage
-                {
-                    Role = "system",
-                    Content = BuildSystemInstruction()
-                },
-                new OllamaMessage
-                {
-                    Role = "user",
-                    Content = userMessage
-                }
-            ]
+            Messages = messages
         });
 
         return request;
@@ -157,6 +173,7 @@ public sealed class OllamaChatClient : IAiChatClient
         return """
             You are Shiro, a careful personal AI assistant inside a learning project.
             Be conversational, concise, and useful. Prefer short replies of 4 to 8 sentences unless the user asks for detail.
+            Use the recent conversation history to remember context inside the current chat.
             Current backend tools:
             - If the user wants a local task, tell them to say: create task <title>.
             - If the user asks to send email, call someone, message someone, delete files, pay bills, or take another risky action, explain that Shiro must ask for approval first and must not claim the action is done.
